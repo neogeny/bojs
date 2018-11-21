@@ -1,0 +1,750 @@
+(*
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2014 by Bart Kiers (original author) and Alexandre Vitorelli (contributor -> ported to CSharp)
+ * Copyright (c) 2017 by Ivan Kochurkin (Positive Technologies):
+    added ECMAScript 6 support, cleared and transformed to the universal grammar.
+ * Copyright (c) 2018 by Juancarlo Añez. Translated grammar to TatSu.
+ *
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use,
+ * copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *)
+
+@@grammar :: JavaScript
+
+@@comments :: ?/\/\*(.|[\r\n])*?\*\//?
+@@eol_comments :: ?/\/\/[^\r\n]*(\r?\n|\r|$)/?
+@@left_recursion :: False
+@@ignorecase :: False
+
+@@keyword :: break case catch class const continue
+@@keyword :: debugger default delete do
+@@keyword :: else enum export extends
+@@keyword :: finally for function
+@@keyword :: if implements import in instanceof interface
+@@keyword :: let new
+@@keyword :: package private protected public
+@@keyword :: return static super switch
+@@keyword :: this throw try typeof
+@@keyword :: var void
+@@keyword :: while with
+@@keyword :: yield
+
+
+start
+    =
+    @:program $
+    ;
+
+program
+    =
+    [ '"' 'use' 'strict' '"' ';']
+    source_elements
+    ;
+
+
+source_element
+    =
+    ['export'] statement
+    ;
+
+
+statement
+    =
+    | block
+    | variable_statement
+    | empty_statement
+    | expression_statement
+    | if_statement
+    | iteration_statement
+    | continue_statement
+    | break_statement
+    | return_statement
+    | with_statement
+    | labelled_statement
+    | switch_statement
+    | throw_statement
+    | try_statement
+    | debugger_statement
+    | function_declaration
+    | class_declaration
+    ;
+
+
+block
+    =
+    '{' [statement_list] '}'
+    ;
+
+
+statement_list
+    =
+    {statement}+
+    ;
+
+
+variable_statement
+    =
+    var_modifier variable_declaration_list eos
+    ;
+
+
+variable_declaration_list
+    =
+    variable_declaration {',' variable_declaration}
+    ;
+
+
+variable_declaration
+    =
+    (identifier | array_literal | object_literal) ['=' expression]
+    ;
+
+
+empty_statement
+    =
+    ';'
+    ;
+
+
+expression_statement
+    =
+    expressions eos
+    ;
+
+
+if_statement
+    =
+    'if' '(' expressions ')' statement ['else' statement]
+    ;
+
+
+iteration_statement
+    =
+        'do' statement 'while' '(' expressions ')' eos
+    |
+        'while' '(' expressions ')' statement
+    |
+        'for'
+        '('
+        [expressions]
+        ';'
+        [expressions]
+        ';'
+        [expressions]
+        ')'
+        statement
+    |
+        'for'
+        '('
+        var_modifier
+        variable_declaration_list
+        ';'
+        [expressions]
+        ';'
+        [expressions]
+        ')'
+        statement
+    |
+        'for'
+        '('
+        expression
+        ('in' | identifier)
+        expressions
+        ')'
+        statement
+    |
+        'for'
+        '('
+        var_modifier
+        variable_declaration
+        ('in' | identifier)
+        expressions
+        ')'
+        statement
+    ;
+
+
+var_modifier
+    =
+    'var' | 'let' | 'const'
+    ;
+
+
+continue_statement
+    =
+    'continue' [identifier] eos
+    ;
+
+
+break_statement
+    =
+    'break' [identifier] eos
+    ;
+
+
+return_statement
+    =
+    'return' [expressions] eos
+    ;
+
+
+with_statement
+    =
+    'with' '(' expressions ')' statement
+    ;
+
+
+switch_statement
+    =
+    'switch' '(' expressions ')' case_block
+    ;
+
+
+case_block
+    =
+    '{' [case_clauses] [default_clause [case_clauses]] '}'
+    ;
+
+
+case_clauses
+    =
+    {case_clause}+
+    ;
+
+
+case_clause
+    =
+    'case' expressions ':' [statement_list]
+    ;
+
+
+default_clause
+    =
+    'default' ':' [statement_list]
+    ;
+
+
+labelled_statement
+    =
+    identifier ':' statement
+    ;
+
+
+throw_statement
+    =
+    'throw' expressions eos
+    ;
+
+
+try_statement
+    =
+    'try' block (catch_production [finally_production] | finally_production)
+    ;
+
+
+catch_production
+    =
+    'catch' '(' identifier ')' block
+    ;
+
+
+finally_production
+    =
+    'finally' block
+    ;
+
+
+debugger_statement
+    =
+    'debugger' eos
+    ;
+
+
+function_declaration
+    =
+    'function'
+    identifier
+    '('
+    [formal_parameter_list]
+    ')'
+    '{'
+    function_body
+    '}'
+    ;
+
+
+class_declaration
+    =
+    'class' identifier class_tail
+    ;
+
+
+class_tail
+    =
+    ['extends' expression] '{' {class_element} '}'
+    ;
+
+
+class_element
+    =
+        [
+        'static' | identifier
+        ]
+
+        method_definition
+    |
+        empty_statement
+    ;
+
+
+method_definition
+    =
+    | property_name '(' [formal_parameter_list] ')' '{' function_body '}'
+    | getter '(' ')' '{' function_body '}'
+    | setter '(' [formal_parameter_list] ')' '{' function_body '}'
+    | generator_method
+    ;
+
+
+generator_method
+    =
+    ['*'] identifier '(' [formal_parameter_list] ')' '{' function_body '}'
+    ;
+
+
+formal_parameter_list
+    =
+        formal_parameter_arg
+        {',' formal_parameter_arg}
+        [',' last_formal_parameter_arg]
+    |
+        last_formal_parameter_arg
+    |
+        array_literal
+    |
+        object_literal
+    ;
+
+
+formal_parameter_arg
+    =
+    identifier ['=' expression]
+    ;
+
+
+last_formal_parameter_arg
+    =
+    '...' identifier
+    ;
+
+
+function_body
+    =
+    source_elements
+    ;
+
+
+source_elements
+    =
+    {source_element}
+    ;
+
+
+array_literal
+    =
+    '[' {','} [element_list] {','} ']'
+    ;
+
+
+element_list
+    =
+    | expression {{','}+ expression} [{','}+ last_element]
+    | last_element
+    ;
+
+
+last_element
+    =
+    '...' identifier
+    ;
+
+
+object_literal
+    =
+    '{' [property_assignment {',' property_assignment}] [','] '}'
+    ;
+
+
+property_assignment
+    =
+    | property_name /[:=]/ expression
+    | '[' expression ']' ':' expression
+    | getter '(' ')' '{' function_body '}'
+    | setter '(' identifier ')' '{' function_body '}'
+    | generator_method
+    | identifier
+    ;
+
+
+property_name
+    =
+    identifier_name | string_literal | numeric_literal
+    ;
+
+
+arguments
+    =
+    '('
+    [
+    | expression {',' expression} [',' last_argument]
+    | last_argument
+    ]
+
+    ')'
+    ;
+
+
+last_argument
+    =
+    '...' identifier
+    ;
+
+
+expressions
+    =
+    ','.{expression}
+    ;
+
+
+expression
+    =
+    | 'this'
+    | 'super'
+    |   'function' [identifier]
+        '(' [formal_parameter_list] ')'
+        '{' function_body '}'
+    | 'class' [identifier] class_tail
+    | 'new' expression [arguments]
+    | 'delete' expression
+    | 'void' expression
+    | 'typeof' expression
+    | '++' expression
+    | '--' expression
+    | '+' expression
+    | '-' expression
+    | '~' expression
+    | '!' expression
+    | expression '[' expressions ']'
+    | expression '.' identifier_name
+    | expression arguments
+    | expression '++'
+    | expression '--'
+    | expression ?"[*/%]" expression
+    | expression /[+-]/ expression
+    | expression ('<<' | '>>' | '>>>') expression
+    | expression (/[<>]/ | '<=' | '>=' | '>' | '<') expression
+    | expression 'instanceof' expression
+    | expression 'in' expression
+    | expression ('==' | '!=' | '===' | '!==') expression
+    | expression '&' expression
+    | expression '^' expression
+    | expression '|' expression
+    | expression '&&' expression
+    | expression '||' expression
+    | expression '?' expression ':' expression
+    | expression '=' expression
+    | expression assignment_operator expression
+    | expression TEMPLATE_STRING_LITERAL
+    | identifier
+    | literal
+    | array_literal
+    | object_literal
+    | '(' expressions ')'
+    | arrow_function_parameters '=>' arrow_function_body
+    ;
+
+
+arrow_function_parameters
+    =
+    identifier | '(' [formal_parameter_list] ')'
+    ;
+
+
+arrow_function_body
+    =
+    expression | '{' function_body '}'
+    ;
+
+
+assignment_operator
+    =
+    | '*='
+    | '/='
+    | '%='
+    | '+='
+    | '-='
+    | '<<='
+    | '>>='
+    | '>>>='
+    | '&='
+    | '^='
+    | '|='
+    ;
+
+
+literal
+    =
+    | null
+    | boolean_literal
+    | string_literal
+    | TEMPLATE_STRING_LITERAL
+    | REGULAR_EXPRESSION_LITERAL
+    | numeric_literal
+    ;
+
+
+null
+    =
+    'null' ~
+    ;
+
+
+numeric_literal
+    =
+    |   floating_point_literal
+    |   integer_literal
+    ;
+
+
+identifier_name
+    =
+    identifier | reserved_word
+    ;
+
+
+reserved_word
+    =
+    keyword | 'null' | boolean_literal
+    ;
+
+
+keyword
+    =
+    | 'break'
+    | 'do'
+    | 'instanceof'
+    | 'typeof'
+    | 'case'
+    | 'else'
+    | 'new'
+    | 'var'
+    | 'catch'
+    | 'finally'
+    | 'return'
+    | 'void'
+    | 'continue'
+    | 'for'
+    | 'switch'
+    | 'while'
+    | 'debugger'
+    | 'function'
+    | 'this'
+    | 'with'
+    | 'default'
+    | 'if'
+    | 'throw'
+    | 'delete'
+    | 'in'
+    | 'try'
+    | 'class'
+    | 'enum'
+    | 'extends'
+    | 'super'
+    | 'const'
+    | 'export'
+    | 'import'
+    | 'implements'
+    | 'let'
+    | 'private'
+    | 'public'
+    | 'interface'
+    | 'package'
+    | 'protected'
+    | 'static'
+    | 'yield'
+    ;
+
+
+getter
+    =
+    identifier property_name
+    ;
+
+
+setter
+    =
+    identifier property_name
+    ;
+
+
+eos
+    =
+    ';' | $
+    ;
+
+
+REGULAR_EXPRESSION_LITERAL
+    =
+    '/' {REGULAR_EXPRESSION_CHAR}+ '/'
+    /(?:[\w\d]|\\u[\dA-Fa-f]{4})*/
+    ;
+
+
+boolean_literal
+    =
+    'true' | 'false'
+    ;
+
+
+integer_literal::Integer
+    =
+    value:
+    (
+    | hex_integer_literal
+    | octal_integer_literal
+    | binary_integer_literal
+    | decimal_integer_literal
+    )
+    ;
+
+
+decimal_integer_literal
+    =
+    /(0|[1-9]([_]*[0-9])*)[lL]?/
+    ;
+
+
+hex_integer_literal
+    =
+    /0[xX][0-9a-fA-F]([_]*[0-9a-fA-F])*[lL]?/
+    ;
+
+
+octal_integer_literal
+    =
+    /0[_]*[0-7]([_]*[0-7])*[lL]?/
+    ;
+
+
+binary_integer_literal
+    =
+    /0[bB][01]([01_]*[01])*[lL]?/
+    ;
+
+
+floating_point_literal
+    =
+    | decimal_floating_point_literal
+    | hexadecimal_floating_point_literal
+    ;
+
+
+decimal_floating_point_literal::Float
+    =
+    value:
+    (
+    # DIGITS '.' [DIGITS] [EXPONENT_PART] [FLOAT_TYPE_SUFFIX]
+    | /[0-9][0-9_]*[.][0-9]*([eE][-+]?[0-9]+)?[fFdD]?/
+    # '.' DIGITS [EXPONENT_PART] [FLOAT_TYPE_SUFFIX]
+    | /[.][0-9]+([eE][-+]?[0-9]+)?[fFdD]?/
+    # DIGITS EXPONENT_PART [FLOAT_TYPE_SUFFIX]
+    | /[0-9][0-9_]*[eE][-+]?[0-9]+[fFdD]?/
+    # DIGITS FLOAT_TYPE_SUFFIX
+    | /[0-9][0-9_]*[fFdD]/
+    )
+    ;
+
+
+hexadecimal_floating_point_literal::HexFloat
+    =
+    # HEX_SIGNIFICAND BINARY_EXPONENT [FLOAT_TYPE_SUFFIX]
+    value:
+    /0[xX][0-9a-fA-F]([_]*[0-9a-fA-F])*([.][0-9a-fA-F]*)?[pP][-+]?[0-9]+[fFdD]?/
+    ;
+
+
+identifier
+    =
+    IDENTIFIER
+    ;
+
+
+IDENTIFIER
+    =
+    /[\w$](?:[\w\d]|\\u[\dA-Fa-f]{4})*/
+    # IDENTIFIER_START {IDENTIFIER_PART}
+    ;
+
+
+string_literal
+    =
+    '"' value:/([^"\n\r\\]|\\[btnfr"'\\]|\\[0-7]{1,3}|\\u[0-9a-fA-F]{4})*/ '"'
+    # ('"' {DOUBLE_STRING_CHARACTER} /["\']/ {SINGLE_STRING_CHARACTER} "\\'")
+    ;
+
+
+TEMPLATE_STRING_LITERAL
+    =
+    '`' {'\\\\`' | !'`' /./} '`'
+    ;
+
+
+HTML_COMMENT
+    =
+    '<!--' [/\w+|\S+/] '-->'
+    ;
+
+
+CDATA_COMMENT
+    =
+    '<![CDATA[' [/\w+|\S+/] ']]>'
+    ;
+
+
+REGULAR_EXPRESSION_CHAR
+    =
+    | !?"[\r\n\u2028\u2029\\/[]" /./
+    | REGULAR_EXPRESSION_BACKSLASH_SEQUENCE
+    | '[' {REGULAR_EXPRESSION_CLASS_CHAR} ']'
+    ;
+
+
+REGULAR_EXPRESSION_CLASS_CHAR
+    =
+    !/[\r\n\u2028\u2029\]\\]/ /./ | REGULAR_EXPRESSION_BACKSLASH_SEQUENCE
+    ;
+
+
+REGULAR_EXPRESSION_BACKSLASH_SEQUENCE
+    =
+    '\\\\' !/[\r\n\u2028\u2029]/ /./
+    ;
